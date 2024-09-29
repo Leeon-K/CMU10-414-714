@@ -5,6 +5,40 @@
 
 namespace py = pybind11;
 
+void matmul(const float* A, const float* B, float* C, size_t M, size_t K, size_t N) {
+    for (int i = 0; i < M; i++) {
+        for (int j = 0; j < N; ++j) {
+            float sum = 0.0f;
+            for (int k = 0; k < K; ++k) {
+                sum += A[i * K + k] * B[k * N + j];
+            }
+            C[i * N + j] = sum;
+        }
+    }
+}
+
+void normalize_(float* input, int n, int k) {
+    // inplace normal_
+    float sum = 0.0f;
+    for (int i = 0; i < n; ++i) {
+        sum = 0.0f;
+        for (int j = 0; j < k; ++j) {
+            input[i * k + j] = std::exp(input[i * k + j]);
+            sum += input[i * k + j];
+        }
+        for (int j = 0; j < k; ++j) {
+            input[i * k + j] = input[i * k + j] / (sum);
+        }
+    }
+}
+
+void transpose(const float* A, float* B, int m, int n) {
+    for (int i = 0; i < m; ++i) {
+        for (int j = 0; j < n; ++j) {
+            B[j * m + i] = A[i * n + j];
+        }
+    }
+}
 
 void softmax_regression_epoch_cpp(const float *X, const unsigned char *y,
 								  float *theta, size_t m, size_t n, size_t k,
@@ -33,7 +67,37 @@ void softmax_regression_epoch_cpp(const float *X, const unsigned char *y,
      */
 
     /// BEGIN YOUR CODE
-
+    for (int i = 0; i < m; i += batch) {
+        float* X_T = new float[n * batch];
+        float* Z = new float[batch * k];
+        float* deta = new float[n * k];
+        const float* X_mini = new float[n * batch];
+        // const unsigned char *y_mini = new unsigned char[batch];
+        X_mini = &X[i * n];
+        // y_mini = &y[i];
+        // X += batch * n; # 常量指针不能自加
+        // y += batch;
+        // X += i * n;
+        // y += i;
+        transpose(X_mini, X_T, batch, n);
+        matmul(X_mini, theta, Z, batch, n, k); // batch * n @ n * k  矩阵乘完 nan了 为啥
+        // transpose(X, X_T, batch, n);
+        // matmul(X, theta, Z, batch, n, k); // batch * n @ n * k  矩阵乘完 nan了 为啥
+        
+        normalize_(Z, batch, k); // batch * k
+        for (int bid = 0; bid < batch; ++bid) {
+            // Z[bid * k + y_mini[bid]] -= 1.0;
+            Z[bid * k + y[bid + i]] -= 1.0;
+        }
+        matmul(X_T, Z, deta, n, batch, k); // n * batch @  batch * k,
+        
+        for (int theta_ = 0; theta_ < n * k; ++theta_) {
+            theta[theta_] -= lr / batch * deta[theta_];
+        }
+        delete[] X_T;
+        delete[] Z;
+        delete[] deta;
+    }
     /// END YOUR CODE
 }
 

@@ -20,7 +20,7 @@ def add(x, y):
         Sum of x + y
     """
     ### BEGIN YOUR CODE
-    pass
+    return x + y
     ### END YOUR CODE
 
 
@@ -48,7 +48,24 @@ def parse_mnist(image_filename, label_filename):
                 for MNIST will contain the values 0-9.
     """
     ### BEGIN YOUR CODE
-    pass
+    with gzip.open(image_filename, 'rb') as f:
+        image = f.read()
+    # description = np.frombuffer(image, dtype=np.int32, count=4)
+    description = np.frombuffer(image, dtype='>i4', count=4)
+    # print("magic num, M, row, col", description)
+    image_arr = np.frombuffer(image, dtype=np.uint8, offset=16)
+    image_arr = image_arr.reshape(-1, description[2] * description[3])
+    # print(description[1],description[2] * description[3],image_arr.shape)
+    with gzip.open(label_filename, 'rb') as f:
+        label = f.read()
+    description_label = np.frombuffer(label, dtype='>i4', count=2)
+    # print("magic num, M", description_label)
+    label_arr = np.frombuffer(label, dtype=np.uint8, offset=8)
+    
+    # normalization 先
+    image_arr = image_arr.astype('float32')
+    image_arr = np.float32(image_arr / 255)
+    return image_arr, label_arr
     ### END YOUR CODE
 
 
@@ -68,7 +85,13 @@ def softmax_loss(Z, y):
         Average softmax loss over the sample.
     """
     ### BEGIN YOUR CODE
-    pass
+    # 
+    bs = Z.shape[0]
+    # y_Z 是 true_label 位置的 预测Z 概率 
+    # y_Z = [Z[i][y[i]] for i in range(bs)]
+    y_Z = Z[np.arange(Z.shape[0]), y] # 每个取y位置
+    # print(y_Z)
+    return np.mean(np.log(np.sum(np.exp(Z), axis = 1)) - y_Z, axis=0)
     ### END YOUR CODE
 
 
@@ -90,8 +113,26 @@ def softmax_regression_epoch(X, y, theta, lr = 0.1, batch=100):
     Returns:
         None
     """
-    ### BEGIN YOUR CODE
-    pass
+    ## BEGIN YOUR CODE
+    # Z = X @ theta # num_examples, cls
+    # Z = np.exp(Z) / (np.sum(np.exp(Z), axis = 1).reshape(-1, 1)) # num_examples, cls
+    
+    # Z[np.arange(Z.shape[0]), y] -= 1
+    
+    # for i in range(0, X.shape[0], batch):
+    #     X_mini = X[i: i + batch]
+    #     Z_mini = Z[i: i + batch]
+    #     deta = X_mini.T @ Z_mini / batch
+    #     theta -= lr * deta 
+    for i in range(0, X.shape[0], batch):
+        X_mini = X[i: i+batch] # bs input_dim
+        y_mini = y[i: i+batch]
+        Z = X_mini @ theta # bs * cls
+        Z = np.exp(Z) / ((np.exp(Z)).sum(axis=1)).reshape(-1, 1)
+        Z[np.arange(Z.shape[0]), y_mini] -= 1
+        deta = np.dot(X_mini.T, Z) / batch # input_dim, cls
+        theta -= lr * deta
+        
     ### END YOUR CODE
 
 
@@ -118,7 +159,26 @@ def nn_epoch(X, y, W1, W2, lr = 0.1, batch=100):
         None
     """
     ### BEGIN YOUR CODE
-    pass
+    for i in range(0, X.shape[0], batch):
+        X_mini = X[i: i+batch]
+        y_mini = y[i: i+batch]
+        
+        Z_1 = X_mini @ W1 # bs x hd
+        Z_1 = np.where(Z_1 > 0, Z_1, 0)
+        Z_2 = Z_1 @ W2 # bs x cls
+        
+        # Z_2 = X_mini @ theta # bs * cls
+        Z_2 = np.exp(Z_2) / ((np.exp(Z_2)).sum(axis=1)).reshape(-1, 1)
+        Z_2[np.arange(Z_2.shape[0]), y_mini] -= 1
+        deta_2 = np.dot(Z_1.T, Z_2) # num_examples, input_dim  * num_examples, cls -> num_examples, input_dim, cls
+        # W2 -= lr * deta_2
+        
+        G1 = np.where(Z_1 > 0, 1, 0) * (Z_2 @ W2.T)
+        deta_1 = X_mini.T @ G1 # bs x cls   hd x cls
+        # 先算完 再更新
+        W2 -= lr * deta_2 / batch
+        W1 -= lr * deta_1 / batch
+    
     ### END YOUR CODE
 
 

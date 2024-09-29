@@ -181,10 +181,15 @@ def test_softmax_regression_epoch_cpp():
     softmax_regression_epoch_cpp(X,y,Theta,lr=1.0,batch=50)
     np.testing.assert_allclose(dTheta.reshape(5,3), Theta, rtol=1e-4, atol=1e-4)
 
-
+    
     # test multi-steps on MNIST
     X,y = parse_mnist("data/train-images-idx3-ubyte.gz",
                       "data/train-labels-idx1-ubyte.gz")
+    # print("X:" , X.shape)
+    # print("y:", y.shape)
+    # for i in range(0, 100, 10):
+    #     print(i, y[i])
+        
     theta = np.zeros((X.shape[1], y.max()+1), dtype=np.float32)
     softmax_regression_epoch_cpp(X[:100], y[:100], theta, lr=0.1, batch=10)
     np.testing.assert_allclose(np.linalg.norm(theta), 1.0947356, 
@@ -194,7 +199,6 @@ def test_softmax_regression_epoch_cpp():
 def submit_softmax_regression_epoch_cpp():
     X,y = parse_mnist("data/t10k-images-idx3-ubyte.gz",
                       "data/t10k-labels-idx1-ubyte.gz")
-
     theta = np.zeros((X.shape[1], y.max()+1), dtype=np.float32)
     softmax_regression_epoch_cpp(X[:100], y[:100], theta, lr=0.2, batch=100)
     mugrade.submit(np.linalg.norm(theta))
